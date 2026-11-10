@@ -1,0 +1,3 @@
+{"question": "Which file is the command line entry point and which library parses the arguments?", "keywords": ["cli.js", "commander"], "files": ["cli.js"]}
+{"question": "Which function does the actual counting and in which file?", "keywords": ["countFile", "index.js"], "files": ["index.js"]}
+{"question": "What does the --json flag change?", "keywords": ["json", "formatReport"], "files": ["report.js"]}

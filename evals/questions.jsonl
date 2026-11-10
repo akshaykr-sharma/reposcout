@@ -1,8 +1,11 @@
 {"question": "Which file builds the deep agent, and what kind of backend does it use for the filesystem?", "keywords": ["agent.py", "CompositeBackend"], "files": ["agent.py"]}
 {"question": "Where in the code are writes to the studied repo blocked, and how?", "keywords": ["permission", "deny", "/repo/"], "files": ["agent.py"]}
-{"question": "What does the python_outline tool return for a file?", "keywords": ["class", "function", "import"], "files": ["tools.py"]}
+{"question": "What does the python_outline tool return for a file?", "keywords": ["class", "function|def", "import"], "files": ["tools.py"]}
 {"question": "How does the command line app keep a conversation between runs?", "keywords": ["sqlite", "session"], "files": ["cli.py"]}
-{"question": "Which subagents does RepoScout have and what is each one for?", "keywords": ["module-analyst", "flow-tracer", "doc-writer"], "files": ["agent.py"]}
+{"question": "Which subagents does RepoScout have and what is each one for?", "keywords": ["module-analyst", "flow-tracer", "risk-analyst", "doc-writer"], "files": ["agent.py"]}
 {"question": "Why is the Ollama context size raised to 16384 by default?", "keywords": ["context", "prompt"], "files": ["llm.py"]}
-{"question": "Where does RepoScout keep long-term memory about the user's preferences?", "keywords": ["/memories/AGENTS.md", "store"], "files": ["agent.py"]}
+{"question": "Where does RepoScout keep long-term memory about the user's preferences, and who must approve changes to it?", "keywords": ["/memories/AGENTS.md", "store", "approv|interrupt"], "files": ["agent.py"]}
 {"question": "What happens in the terminal when the reviewer rejects a file the agent wants to write?", "keywords": ["reject", "reason"], "files": ["console.py"]}
+{"question": "How does RepoScout avoid re-analysing a module that has not changed since the last run?", "keywords": ["fingerprint", "cache"], "files": ["tools.py"]}
+{"question": "Which files can the agent not read, and where is that enforced?", "keywords": [".env", "deny|denied|blocked"], "files": ["fsutil.py", "agent.py"]}
+{"question": "How is the generated onboarding pack checked for invented file paths?", "keywords": ["validate", "exist"], "files": ["validate.py"]}

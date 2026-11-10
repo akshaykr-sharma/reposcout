@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reposcout"
+version = "0.2.0"
+description = "Local codebase onboarding agent (deepagents + LangGraph + Ollama)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "deepagents>=0.7.35,<0.8",
+    "langchain-ollama>=1.1",
+    "langgraph-checkpoint-sqlite>=3.0",
+    "langsmith>=0.4",
+    "python-dotenv>=1.0",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+studio = ["langgraph-cli[inmem]"]
+
+[project.scripts]
+reposcout = "reposcout.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["reposcout*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
