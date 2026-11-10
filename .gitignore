@@ -1,0 +1,24 @@
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# secrets
+.env
+
+# local state (sqlite checkpoints, memory store, caches)
+.reposcout/
+.prepkit/
+.librarian/
+.langgraph_api/
+
+# generated output
+output/
+
+# editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

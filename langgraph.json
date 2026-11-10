@@ -1,0 +1,8 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "reposcout": "./reposcout/graph.py:agent"
+  },
+  "env": ".env",
+  "python_version": "3.11"
+}
