@@ -11,6 +11,8 @@ What you see while it runs:
     ->      a tool call made by the main agent
     |  ->   a tool call made inside a subagent (indented)
     !       a tool error (for example a blocked write)
+    spinner a status line while the model is thinking, so a slow local model
+            does not look frozen
 
 Nothing project specific lives here, so the same file can be dropped into
 any deep agent project that needs a terminal front end.
@@ -61,7 +63,7 @@ def show_todos(todos: list[dict]) -> None:
     console.print(table)
 
 
-def _render_update(namespace: tuple, update: dict, seen: set) -> None:
+def _render_update(namespace: tuple, update: dict, seen: set, status=None) -> None:
     in_subagent = bool(namespace)
     pad = "[dim]|[/]  " if in_subagent else ""
 
@@ -79,23 +81,32 @@ def _render_update(namespace: tuple, update: dict, seen: set) -> None:
                     who = call["args"].get("subagent_type", "?")
                     what = _short(call["args"].get("description", ""), 110)
                     console.print(f"{pad}[magenta]-> delegating to {who}[/]: {what}")
+                    if status:
+                        status.update(f"[dim]{who} is working...[/]")
                 else:
                     console.print(f"{pad}[cyan]-> {call['name']}[/] {_short(call['args'])}")
+                    if status:
+                        status.update(f"[dim]running {call['name']}...[/]")
             if not msg.tool_calls and msg.text.strip() and not in_subagent:
                 console.print(Panel(Markdown(msg.text), border_style="green", title="agent"))
         elif isinstance(msg, ToolMessage):
             text = msg.text
+            # Our own tools set status="error". deepagents' built-in file tools
+            # return plain "Error: ..." strings instead, so keep that as a fallback.
             if msg.status == "error" or text.startswith("Error"):
                 console.print(f"{pad}[red]! {_short(text, 160)}[/]")
 
 
 def _stream(agent, payload, config, seen: set) -> None:
-    for namespace, chunk in agent.stream(payload, config, stream_mode="updates", subgraphs=True):
-        if not isinstance(chunk, dict):
-            continue
-        for update in chunk.values():
-            if isinstance(update, dict):
-                _render_update(namespace, update, seen)
+    # the spinner is stopped before any approval prompt, because the stream has ended by then
+    with console.status("[dim]thinking...[/]", spinner="dots") as status:
+        for namespace, chunk in agent.stream(payload, config, stream_mode="updates", subgraphs=True):
+            if not isinstance(chunk, dict):
+                continue
+            for update in chunk.values():
+                if isinstance(update, dict):
+                    _render_update(namespace, update, seen, status)
+                    status.update("[dim]thinking...[/]")
 
 
 def _preview_action(action: dict) -> None:
