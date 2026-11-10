@@ -7,5 +7,9 @@ langsmith>=0.4
 python-dotenv>=1.0
 rich>=13.0
 
+# optional cloud models (only needed if you set REPOSCOUT_MODEL to anthropic: / google:)
+# langchain-anthropic>=1.0
+# langchain-google-genai>=3.0
+
 # optional: local dev server + LangGraph Studio (`langgraph dev`)
 # pip install "langgraph-cli[inmem]"

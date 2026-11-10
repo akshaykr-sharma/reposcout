@@ -5,7 +5,7 @@ from deepagents.middleware.filesystem import _check_fs_permission
 
 from reposcout.agent import build_agent, build_permissions
 from reposcout.config import ConfigError, load_settings
-from reposcout.llm import OllamaUnavailable, check_ollama
+from reposcout.llm import ModelUnavailable, check_models
 from reposcout.sessions import bind_session
 
 
@@ -88,7 +88,8 @@ def test_session_bound_to_repo(tmp_path):
 
 # --- ollama check ------------------------------------------------------------
 
-def test_check_ollama_unreachable(monkeypatch):
+def test_check_models_ollama_unreachable(monkeypatch):
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://127.0.0.1:9")
-    with pytest.raises(OllamaUnavailable, match="ollama serve"):
-        check_ollama(load_settings(), timeout=0.5)
+    monkeypatch.delenv("REPOSCOUT_MODEL", raising=False)
+    with pytest.raises(ModelUnavailable, match="ollama serve"):
+        check_models(load_settings(), timeout=0.5)

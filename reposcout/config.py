@@ -61,6 +61,15 @@ def _env_float(name: str, default: float) -> float:
         raise ConfigError(f"{name} must be a number, got {raw!r}") from None
 
 
+def _env_first(*names: str) -> str:
+    """First non-empty value among several variable names (new name first, old alias after)."""
+    for name in names:
+        value = os.getenv(name, "").strip()
+        if value:
+            return value
+    return ""
+
+
 def _env_path(name: str, default: Path) -> Path:
     # empty values in .env count as "not set"
     raw = os.getenv(name, "").strip()
@@ -83,10 +92,16 @@ class Settings:
     docs_dir: Path
     data_dir: Path
     extra_ignores: list[str] = field(default_factory=list)
-    # Optional per-role models. Empty means "use ollama_model".
+    # Model specs ("provider:model", see llm.py). Empty means "use the main model".
+    model: str = ""           # main agent; empty = ollama:<ollama_model>
     analyst_model: str = ""   # module-analyst, flow-tracer, risk-analyst
     writer_model: str = ""    # doc-writer
     judge_model: str = ""     # evals only
+
+    @property
+    def main_model(self) -> str:
+        """Spec of the main model; local Ollama unless REPOSCOUT_MODEL says otherwise."""
+        return self.model or f"ollama:{self.ollama_model}"
 
     @property
     def ignores(self) -> set[str]:
@@ -122,9 +137,10 @@ def load_settings() -> Settings:
         docs_dir=docs,
         data_dir=data,
         extra_ignores=extra,
-        analyst_model=os.getenv("OLLAMA_ANALYST_MODEL", "").strip(),
-        writer_model=os.getenv("OLLAMA_WRITER_MODEL", "").strip(),
-        judge_model=os.getenv("OLLAMA_JUDGE_MODEL", "").strip(),
+        model=_env_first("REPOSCOUT_MODEL"),
+        analyst_model=_env_first("REPOSCOUT_ANALYST_MODEL", "OLLAMA_ANALYST_MODEL"),
+        writer_model=_env_first("REPOSCOUT_WRITER_MODEL", "OLLAMA_WRITER_MODEL"),
+        judge_model=_env_first("REPOSCOUT_JUDGE_MODEL", "OLLAMA_JUDGE_MODEL"),
     )
 
 

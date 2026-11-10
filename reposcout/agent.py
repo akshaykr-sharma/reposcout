@@ -24,7 +24,8 @@ How the pieces fit:
 
     Subagents (called through the built-in `task` tool)
         module-analyst, flow-tracer, risk-analyst, doc-writer
-        Each can run on its own model (OLLAMA_ANALYST_MODEL / OLLAMA_WRITER_MODEL).
+        Each can run on its own model (REPOSCOUT_ANALYST_MODEL / REPOSCOUT_WRITER_MODEL);
+        models can be local Ollama, Anthropic Claude or Google Gemini (see llm.py).
 
     Middleware
         TodoListMiddleware gives the agent `write_todos` for planning.
@@ -48,7 +49,7 @@ from langchain.agents.middleware import TodoListMiddleware
 
 from .config import Settings, ensure_dirs
 from .fsutil import SECRET_ALLOW_READ_GLOBS, SECRET_READ_GLOBS
-from .llm import get_chat_model
+from .llm import get_chat_model, parse_spec
 from .prompts import (
     DOC_WRITER_PROMPT,
     FLOW_TRACER_PROMPT,
@@ -87,11 +88,11 @@ def build_permissions(read_only: bool) -> list[FilesystemPermission]:
     ]
 
 
-def _role_model(settings: Settings, name: str):
+def _role_model(settings: Settings, spec: str):
     """A dedicated model for a role, or None to inherit the main one."""
-    if not name or name == settings.ollama_model:
+    if not spec or parse_spec(spec) == parse_spec(settings.main_model):
         return None
-    return get_chat_model(settings, model=name)
+    return get_chat_model(settings, model=spec)
 
 
 def _spec(name: str, description: str, prompt: str, tools: list, role_model) -> dict:

@@ -148,9 +148,42 @@ Ctrl-C while the agent works cancels that turn; Ctrl-C at the prompt exits.
 - Writes to `/docs/` **and** `/memories/` need your approval. Text in the studied repo is untrusted, so a poisoned file cannot silently change what the agent remembers.
 - Module notes are cached in `.reposcout/cache/<repo>/modules/` under a fingerprint of the folder. A second `--pack` only re-analyses folders that changed.
 
+### Using Claude or Gemini instead of (or next to) Ollama
+
+Ollama stays the default: free, private, offline. For better answers and much faster runs you can switch to a cloud model. Put the key and the model in `.env`:
+
+```bash
+pip install -e ".[cloud]"                 # or .[anthropic] / .[google]
+
+# .env
+ANTHROPIC_API_KEY=sk-ant-...
+REPOSCOUT_MODEL=anthropic:claude-sonnet-5-5
+```
+
+```bash
+# Gemini
+GOOGLE_API_KEY=...                        # GEMINI_API_KEY also works
+REPOSCOUT_MODEL=google:gemini-2.5-flash
+```
+
+or pick per run: `python -m reposcout.cli --model anthropic --pack`. A bare provider name (`anthropic`, `google`) uses that provider's default model; change the model name any time to one your account can use.
+
+You can mix them per role, e.g. fast analysts and a strong writer:
+
+```bash
+REPOSCOUT_ANALYST_MODEL=google:gemini-2.5-flash
+REPOSCOUT_WRITER_MODEL=anthropic:claude-sonnet-5-5
+```
+
+Things to know:
+- **Privacy:** with a cloud model the code the agent reads is sent to that provider; the CLI prints a notice when this is the case. Credential files stay blocked, and `ollama:` models keep everything local.
+- **Cost:** a full `--pack` makes many model calls. Module notes are cached, so re-runs are cheaper.
+- The CLI checks at start that Ollama is up (only if you use it) and that each API key is set. It does not call the cloud, so a wrong key shows up on the first request.
+- `OLLAMA_NUM_CTX` and `OLLAMA_TEMPERATURE` apply to Ollama only; cloud models use provider defaults.
+
 ### Models per role (optional)
 
-Set `OLLAMA_ANALYST_MODEL` (module-analyst, flow-tracer, risk-analyst) and/or `OLLAMA_WRITER_MODEL` (doc-writer) in `.env` to use different models; empty means `OLLAMA_MODEL`.
+Set `REPOSCOUT_ANALYST_MODEL` (module-analyst, flow-tracer, risk-analyst) and/or `REPOSCOUT_WRITER_MODEL` (doc-writer) to use different models; empty means the main model. The older `OLLAMA_ANALYST_MODEL` / `OLLAMA_WRITER_MODEL` names still work.
 
 ### Tests
 
@@ -201,7 +234,7 @@ Things worth looking at in a trace:
 
 ```bash
 python evals/run_evals.py --local            # no account needed
-python evals/run_evals.py --local --judge --judge-model llama3.1:8b   # LLM judge, a DIFFERENT model
+python evals/run_evals.py --local --judge --judge-model anthropic   # LLM judge, a DIFFERENT model
 python evals/run_evals.py --local --fixtures # also run the Flask / Node / Go sample repos
 python evals/run_evals.py                    # push dataset + experiment to LangSmith
 python evals/run_evals.py --check-docs output/docs --repo ../my-app   # validate a finished pack
@@ -212,7 +245,7 @@ The default questions are about RepoScout's own code, so you can check the answe
 - `keyword_recall` - share of expected facts mentioned in the answer
 - `cites_file` - did it point at the right file
 - `paths_exist` - share of file paths named in the answer that really exist in the repo (hallucination check)
-- `judge` - a model grades the answer PASS/FAIL. Use a different model than the one answering (`--judge-model` / `OLLAMA_JUDGE_MODEL`); a small model grading itself is biased.
+- `judge` - a model grades the answer PASS/FAIL. Use a different model than the one answering (`--judge-model` / `REPOSCOUT_JUDGE_MODEL`); a small model grading itself is biased.
 
 A keyword can list alternatives with `|`, e.g. `"sqlite|sqlitesaver"`.
 
@@ -244,6 +277,7 @@ A good loop: run the evals, change one prompt in `prompts.py`, run them again, c
 | The model answers without using tools / ignores the plan | Context too small. Keep `OLLAMA_NUM_CTX=16384` or raise it. Also try a larger model. |
 | `model "qwen2.5:7b" not found` | `ollama pull qwen2.5:7b` |
 | Very slow | Normal on CPU-only machines. Use `--repo` on a small project first, or try `qwen2.5:3b` (weaker at tool calling). |
+| `... API_KEY is not set` on start | You chose a Claude/Gemini model but the key is missing from `.env`. |
 | `Cannot reach Ollama` / `Model(s) not installed` on start | The CLI checks Ollama first and prints the exact `ollama pull` command. Skip the check with `--no-check`. |
 | Run stops with a recursion error | Big repo. Raise `recursion_limit` in `cli.py`, or point `--repo` at a subfolder. |
 | `ModuleNotFoundError: reposcout` | Run commands from the `reposcout/` project folder with the venv active. |

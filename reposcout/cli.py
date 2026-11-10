@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import sqlite3
 import uuid
+from dataclasses import replace
 
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.store.sqlite import SqliteStore
@@ -39,7 +40,7 @@ from rich.prompt import Confirm, Prompt
 from .agent import MEMORY_NAMESPACE, build_agent
 from .config import ConfigError, ensure_dirs, langsmith_enabled, load_settings
 from .console import console, run_turn, show_todos
-from .llm import OllamaUnavailable, check_ollama
+from .llm import ModelUnavailable, check_models, cloud_providers, parse_spec
 from .sessions import bind_session
 from .validate import format_issues, validate_docs
 
@@ -55,7 +56,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--docs", help="where to write the onboarding pack (default: output/docs)")
     parser.add_argument("--session", help="session name to resume; a new one is made if omitted")
     parser.add_argument("--pack", action="store_true", help="start by building the full onboarding pack")
-    parser.add_argument("--no-check", action="store_true", help="skip the Ollama availability check")
+    parser.add_argument("--model", help="main model spec, e.g. anthropic:claude-sonnet-5-5 (default: REPOSCOUT_MODEL)")
+    parser.add_argument("--no-check", action="store_true", help="skip the model availability check")
     return parser.parse_args()
 
 
@@ -90,6 +92,8 @@ def main() -> None:
         raise SystemExit(2) from None
     if args.repo or args.docs:
         settings = settings.with_repo(args.repo or settings.repo_path, args.docs)
+    if args.model:
+        settings = replace(settings, model=args.model)
 
     if not settings.repo_path.is_dir():
         console.print(f"[red]Repo folder not found:[/] {settings.repo_path}")
@@ -97,8 +101,8 @@ def main() -> None:
 
     if not args.no_check:
         try:
-            check_ollama(settings)
-        except OllamaUnavailable as exc:
+            check_models(settings)
+        except ModelUnavailable as exc:
             console.print(f"[red]{exc}[/]")
             raise SystemExit(1) from None
 
@@ -124,10 +128,17 @@ def main() -> None:
     console.rule("[bold]RepoScout")
     console.print(f"repo     : {settings.repo_path}")
     console.print(f"docs out : {settings.docs_dir}")
-    console.print(f"model    : {settings.ollama_model} (ctx {settings.num_ctx})")
+    main = parse_spec(settings.main_model)
+    ctx = f" (ctx {settings.num_ctx})" if main.provider == "ollama" else ""
+    console.print(f"model    : {main}{ctx}")
     if settings.analyst_model or settings.writer_model:
         console.print(
             f"           analysts: {settings.analyst_model or 'same'}, writer: {settings.writer_model or 'same'}"
+        )
+    if cloud_providers(settings):
+        console.print(
+            f"[yellow]cloud model: code the agent reads is sent to {', '.join(cloud_providers(settings))}[/] "
+            "[dim](credential files stay blocked; use an ollama: model to stay fully local)[/]"
         )
     console.print(f"session  : {session}")
     console.print(f"langsmith: {'tracing on' if langsmith_enabled() else 'off'}")

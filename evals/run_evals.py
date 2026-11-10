@@ -16,7 +16,8 @@ Usage:
     python evals/run_evals.py --local                 # no LangSmith, prints a table
     python evals/run_evals.py                         # dataset + experiment in LangSmith
     python evals/run_evals.py --fixtures --local      # the sample repos in evals/fixtures/
-    python evals/run_evals.py --judge --judge-model llama3.1:8b
+    python evals/run_evals.py --judge --judge-model anthropic:claude-sonnet-5-5
+    python evals/run_evals.py --model google:gemini-2.5-flash --local
     python evals/run_evals.py --repo ../my-app --questions my_questions.jsonl
     python evals/run_evals.py --check-docs output/docs --repo ../my-app
 
@@ -34,7 +35,7 @@ Gives:  per-question scores
         earlier runs - useful after changing a prompt or the model.
 
 The judge should be a DIFFERENT model than the one answering (--judge-model or
-OLLAMA_JUDGE_MODEL); a small model grading its own answers is biased.
+REPOSCOUT_JUDGE_MODEL); a small model grading its own answers is biased.
 
 Every run costs one trace per question (plus the judge calls), well inside
 the free 5k/month. The agent runs read-only here, so nothing is written to
@@ -47,6 +48,7 @@ import argparse
 import json
 import sys
 import uuid
+from dataclasses import replace
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -57,7 +59,7 @@ from langgraph.store.memory import InMemoryStore  # noqa: E402
 
 from reposcout.agent import build_agent  # noqa: E402
 from reposcout.config import ConfigError, load_settings  # noqa: E402
-from reposcout.llm import OllamaUnavailable, check_ollama, get_chat_model  # noqa: E402
+from reposcout.llm import ModelUnavailable, check_models, get_chat_model, parse_spec  # noqa: E402
 from reposcout.validate import _candidate_paths, _exists, _repo_index, format_issues, validate_docs  # noqa: E402
 
 DATASET_NAME = "reposcout-qa"
@@ -119,9 +121,9 @@ def make_paths_exist(settings):
 
 
 def make_judge(settings):
-    judge_name = settings.judge_model or settings.ollama_model
-    if judge_name == settings.ollama_model:
-        print("warning: the judge is the same model as the agent - set --judge-model / OLLAMA_JUDGE_MODEL "
+    judge_name = settings.judge_model or settings.main_model
+    if parse_spec(judge_name) == parse_spec(settings.main_model):
+        print("warning: the judge is the same model as the agent - set --judge-model / REPOSCOUT_JUDGE_MODEL "
               "to a different one for an unbiased score")
     model = get_chat_model(settings, model=judge_name)
 
@@ -236,14 +238,15 @@ def one_run(args, settings, questions: list[dict], title: str, dataset_name: str
         evaluators.append(make_judge(settings))
     if args.local:
         return run_local(title, questions, target, evaluators)
-    return run_langsmith(dataset_name, questions, target, evaluators, settings.ollama_model)
+    return run_langsmith(dataset_name, questions, target, evaluators, str(parse_spec(settings.main_model)))
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate RepoScout")
     parser.add_argument("--local", action="store_true", help="run without LangSmith")
     parser.add_argument("--judge", action="store_true", help="add an LLM-as-judge score")
-    parser.add_argument("--judge-model", help="Ollama model for the judge (default: OLLAMA_JUDGE_MODEL)")
+    parser.add_argument("--model", help="model spec for the agent, e.g. anthropic:claude-sonnet-5-5")
+    parser.add_argument("--judge-model", help="model spec for the judge (default: REPOSCOUT_JUDGE_MODEL)")
     parser.add_argument("--repo", help="repo to ask about (default: REPOSCOUT_REPO_PATH)")
     parser.add_argument("--questions", default=str(HERE / "questions.jsonl"))
     parser.add_argument("--fixtures", action="store_true", help="also run the sample repos in evals/fixtures/")
@@ -258,8 +261,9 @@ def main() -> None:
         raise SystemExit(f"Configuration error: {exc}") from None
     if args.repo:
         settings = settings.with_repo(args.repo)
+    if args.model:
+        settings = replace(settings, model=args.model)
     if args.judge_model:
-        from dataclasses import replace
         settings = replace(settings, judge_model=args.judge_model)
 
     if args.check_docs:
@@ -268,10 +272,8 @@ def main() -> None:
 
     if not args.no_check:
         try:
-            check_ollama(settings)
-            if args.judge and settings.judge_model:
-                check_ollama(replace_models(settings, settings.judge_model))
-        except OllamaUnavailable as exc:
+            check_models(settings, extra=(settings.judge_model,) if args.judge and settings.judge_model else ())
+        except ModelUnavailable as exc:
             raise SystemExit(str(exc)) from None
 
     runs = []
@@ -293,12 +295,6 @@ def main() -> None:
         print("\nsummary (averages):")
         for title, averages in summary.items():
             print(f"  {title:12} " + "  ".join(f"{k}={v:.2f}" for k, v in averages.items()))
-
-
-def replace_models(settings, model: str):
-    """Settings whose only configured model is `model` (for the availability check)."""
-    from dataclasses import replace
-    return replace(settings, ollama_model=model, analyst_model="", writer_model="")
 
 
 if __name__ == "__main__":

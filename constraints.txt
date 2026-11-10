@@ -1,6 +1,8 @@
 deepagents==0.7.35
 langchain==1.4.9
+langchain-anthropic==1.7.10
 langchain-core==1.7.7
+langchain-google-genai==4.4.3
 langchain-ollama==1.1.0
 langgraph==1.2.20
 langgraph-checkpoint==4.3.1
